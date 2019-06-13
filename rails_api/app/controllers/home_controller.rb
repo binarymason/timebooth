@@ -1,5 +1,5 @@
 class HomeController < ApplicationController
   def index
-    render plain: "meep\n"
+    render json: { thing_count: Thing.count, things: Thing.all }
   end
 end
