@@ -16,7 +16,16 @@ services:
       - pg_data:/var/lib/postgresql/data
       - pg_wal_mnt:/mnt/server/archivedir
 
-  api: &rails_api
+  archiver:
+    image: alpine
+    build:
+      context: ./archiver
+    command: /usr/src/archive.sh /usr/src/exports /usr/src/archive
+    volumes:
+      - ./mock_archive:/usr/src/archive
+      - pg_wal_mnt:/usr/src/exports/pg_wal_mnt
+
+  api:
     build:
       context: ./rails_api
 
