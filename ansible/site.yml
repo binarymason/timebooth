@@ -1,0 +1,11 @@
+---
+
+- hosts: localhost
+  roles:
+    - role: timebooth
+      vars:
+        timebooth_date: "20019-06-13 19:36:48"
+        timebooth_dir: /tmp/timebooth
+        timebooth_url: "http://localhost"
+        timebooth_port: 8080
+

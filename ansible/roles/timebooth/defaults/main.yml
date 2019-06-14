@@ -1,0 +1,4 @@
+---
+
+nginx_conf_file: "{{ timebooth_dir }}/nginx/nginx.conf"
+docker_compose_file: "{{ timebooth_dir }}/docker-compose.yml"

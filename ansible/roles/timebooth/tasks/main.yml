@@ -1,0 +1,47 @@
+---
+
+- name: ensure ansible dependencies are met for docker-compose
+  pip:
+    name: ['docker', 'docker-compose']
+    extra_args: --user
+
+- name: ensure code is checked out
+  git:
+    repo: 'https://github.com/binarymason/timebooth.git'
+    dest: "{{ timebooth_dir }}"
+    force: yes
+    version: master
+
+- name: "register last commit before {{ timebooth_date }}"
+  shell: "git rev-list -n 1 --before='{{ timebooth_date }}' origin/master"
+  args:
+    chdir: "{{ timebooth_dir }}"
+  register: git_sha1
+
+- name: "ensure code is checked out to {{ timebooth_date }}"
+  git:
+    repo: 'https://github.com/binarymason/timebooth.git'
+    dest: "{{ timebooth_dir }}"
+    version: "{{ git_sha1.stdout }}"
+
+
+- name: "change nginx port from 80 to {{ timebooth_port }}"
+  replace:
+    path: "{{ docker_compose_file }}"
+    regexp: '80:80'
+    replace: '8080:80'
+
+- name: run setup script
+  command: script/setup
+  args:
+    chdir: "{{ timebooth_dir }}"
+
+- name: docker-compose restart
+  docker_compose:
+    project_src: "{{ timebooth_dir }}"
+    build: no
+    restarted: yes
+
+- name: ensure timebooth health endpoint gives a 200
+  uri:
+    url: "{{ timebooth_url }}:{{ timebooth_port }}"

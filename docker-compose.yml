@@ -33,8 +33,6 @@ services:
     volumes:
       - ./rails_api:/usr/src/app
       - bundle:/usr/local/bundle
-    ports:
-      - "3000:3000"
     depends_on:
       - postgres
 
