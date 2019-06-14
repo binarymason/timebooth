@@ -1,47 +1,103 @@
 ---
 
+- name: "we are going to roll back to {{ timebooth_date }}"
+  debug:
+    var: timebooth_date
+
 - name: ensure ansible dependencies are met for docker-compose
   pip:
     name: ['docker', 'docker-compose']
     extra_args: --user
 
-- name: ensure code is checked out
-  git:
-    repo: 'https://github.com/binarymason/timebooth.git'
+- name: TODO -- DELETEME.  copying local code instead of git
+  synchronize:
+    src: "/home/m/code/timebooth-demo/"
     dest: "{{ timebooth_dir }}"
-    force: yes
-    version: master
+    recursive: yes
+    delete: yes
+    rsync_opts:
+      - "--exclude=mock_archive"
 
+
+# - name: ensure code is checked out
+#   git:
+#     repo: 'https://github.com/binarymason/timebooth.git'
+#     dest: "{{ timebooth_dir }}"
+#     force: yes
+#     version: master
+#
 - name: "register last commit before {{ timebooth_date }}"
   shell: "git rev-list -n 1 --before='{{ timebooth_date }}' origin/master"
   args:
     chdir: "{{ timebooth_dir }}"
   register: git_sha1
 
-- name: "ensure code is checked out to {{ timebooth_date }}"
-  git:
-    repo: 'https://github.com/binarymason/timebooth.git'
-    dest: "{{ timebooth_dir }}"
-    version: "{{ git_sha1.stdout }}"
-
-
-- name: "change nginx port from 80 to {{ timebooth_port }}"
-  replace:
-    path: "{{ docker_compose_file }}"
-    regexp: '80:80'
-    replace: '8080:80'
-
-- name: run setup script
-  command: script/setup
+- name: "inspecting log for closest git commit: {{ git_sha1.stdout }}"
+  shell: "git log -1 --pretty=tformat:'%h @ %aD: %s' {{ git_sha1.stdout }}"
   args:
     chdir: "{{ timebooth_dir }}"
+  register: git_log_result
 
-- name: docker-compose restart
+- name: "we are rolling back to this commit: {{ git_log_result.stdout }}"
+  debug:
+    var: git_log_result.stdout
+
+#
+# - name: "ensure code is checked out to {{ timebooth_date }}"
+#   git:
+#     repo: 'https://github.com/binarymason/timebooth.git'
+#     dest: "{{ timebooth_dir }}"
+#     version: "{{ git_sha1.stdout }}"
+
+- name: mock download or NFS mount of backup data
+  synchronize:
+    src: "{{ timebooth_mock_archive }}"
+    dest: "{{ timebooth_dir }}"
+  become: true
+
+- name: ensure mock backup data has correct permissions
+  file:
+    dest: "{{ timebooth_dir }}/mock_archive"
+    recurse: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  become: true
+
+
+- name: template out new docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ timebooth_dir }}/docker-compose.yml"
+
+- name: template out postgres recovery.conf
+  template:
+    src: recovery.conf.j2
+    dest: "{{ timebooth_dir }}/postgres/recovery.conf"
+
+- name: docker-compose down -v
   docker_compose:
     project_src: "{{ timebooth_dir }}"
     build: no
-    restarted: yes
+    state: absent
+    stopped: yes
+    remove_volumes: yes
 
-- name: ensure timebooth health endpoint gives a 200
-  uri:
-    url: "{{ timebooth_url }}:{{ timebooth_port }}"
+- name: docker-compose build
+  docker_compose:
+    project_src: "{{ timebooth_dir }}"
+    build: yes
+
+# - name: run setup script
+#   command: script/setup
+#   args:
+#     chdir: "{{ timebooth_dir }}"
+#
+# - name: docker-compose restart
+#   docker_compose:
+#     project_src: "{{ timebooth_dir }}"
+#     build: no
+#     restarted: yes
+#
+# - name: ensure timebooth health endpoint gives a 200
+#   uri:
+#     url: "{{ timebooth_url }}:{{ timebooth_port }}"
